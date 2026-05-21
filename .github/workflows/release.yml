@@ -47,6 +47,8 @@ jobs:
     needs: [release-please, goreleaser]
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -67,6 +69,4 @@ jobs:
           "
 
       - name: Publish to npm
-        run: cd npm && npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: cd npm && npm publish --provenance --access public
