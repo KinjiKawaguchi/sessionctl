@@ -1,0 +1,26 @@
+{
+  "name": "sessionctl",
+  "version": "0.1.0",
+  "description": "MCP server for persistent SSH/Telnet session management with expect/send and multi-hop chaining",
+  "bin": {
+    "sessionctl": "./bin/sessionctl"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "keywords": [
+    "mcp",
+    "ssh",
+    "telnet",
+    "session",
+    "expect",
+    "network",
+    "cli"
+  ],
+  "author": "Kinji Kawaguchi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KinjiKawaguchi/sessionctl"
+  }
+}
