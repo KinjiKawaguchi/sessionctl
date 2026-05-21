@@ -1,0 +1,22 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Unit tests
+        run: go test ./internal/... -race -timeout 30s
+
+      - name: Integration tests
+        run: go test ./test/integration/ -tags=integration -timeout 60s
