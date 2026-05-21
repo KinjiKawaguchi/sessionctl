@@ -1,0 +1,29 @@
+services:
+  fake-asa:
+    build:
+      context: .
+      dockerfile: Dockerfile.fakedevice
+      args:
+        CMD: fakeasa
+    networks:
+      sccs:
+        aliases:
+          - fake-asa
+
+  fake-switch:
+    build:
+      context: .
+      dockerfile: Dockerfile.fakedevice
+      args:
+        CMD: fakeswitch
+    ports:
+      - "2222:22"
+    environment:
+      ASA_ADDR: "fake-asa:23"
+    depends_on:
+      - fake-asa
+    networks:
+      sccs:
+
+networks:
+  sccs:

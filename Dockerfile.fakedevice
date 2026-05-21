@@ -1,0 +1,11 @@
+FROM golang:1.26-alpine AS build
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG CMD
+RUN go build -o /device ./cmd/${CMD}/
+
+FROM alpine:latest
+COPY --from=build /device /device
+ENTRYPOINT ["/device"]

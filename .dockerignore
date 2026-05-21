@@ -1,0 +1,6 @@
+bin/
+.direnv/
+.git/
+.playwright-mcp/
+result
+sessionctl
