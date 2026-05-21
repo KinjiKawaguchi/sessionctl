@@ -49,7 +49,8 @@ func TestEngine_ExpectFindsPatternInBuffer(t *testing.T) {
 }
 
 func TestEngine_ExpectTimeout(t *testing.T) {
-	reader := strings.NewReader("some irrelevant output")
+	// Pipe never closes — no EOF, purely tests context timeout
+	reader, _ := io.Pipe()
 
 	eng := NewEngine(reader, io.Discard, 1024)
 	defer eng.Close()
@@ -239,5 +240,46 @@ func TestEngine_ExecPattern_SkipsStalePrompt(t *testing.T) {
 	text := string(output)
 	if !strings.Contains(text, "Version 15.2") {
 		t.Fatalf("expected command output, got %q", text)
+	}
+}
+
+func TestEngine_DisconnectedError(t *testing.T) {
+	engineReader, deviceWriter := io.Pipe()
+	eng := NewEngine(engineReader, io.Discard, 1024)
+	defer eng.Close()
+
+	// Close the device side — simulates connection drop
+	deviceWriter.Close()
+	time.Sleep(100 * time.Millisecond)
+
+	// Expect should return a disconnected error immediately, not timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := eng.Expect(ctx, Pattern{Kind: PatternExact, Text: "Switch>"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "disconnected") {
+		t.Fatalf("expected disconnected error, got: %v", err)
+	}
+}
+
+func TestEngine_SendAfterDisconnect(t *testing.T) {
+	engineReader, deviceWriter := io.Pipe()
+	var buf strings.Builder
+	eng := NewEngine(engineReader, &buf, 1024)
+	defer eng.Close()
+
+	deviceWriter.Close()
+	time.Sleep(100 * time.Millisecond)
+
+	ctx := context.Background()
+	err := eng.Send(ctx, "show version\n")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "disconnected") {
+		t.Fatalf("expected disconnected error, got: %v", err)
 	}
 }

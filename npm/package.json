@@ -1,6 +1,6 @@
 {
   "name": "sessionctl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for persistent SSH/Telnet session management with expect/send and multi-hop chaining",
   "bin": {
     "sessionctl": "./run.js"

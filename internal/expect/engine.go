@@ -10,32 +10,39 @@ import (
 
 const defaultPollInterval = 50 * time.Millisecond
 
+// ErrDisconnected is returned when the underlying connection has closed.
+var ErrDisconnected = fmt.Errorf("session disconnected")
+
 // Engine performs expect/send operations on an I/O stream.
 // A background goroutine continuously reads from the reader into a buffer.
 // Expect polls the buffer for pattern matches.
 // Send writes directly to the writer.
 type Engine struct {
-	writer io.Writer
-	buffer *CircularBuffer
-	mu     sync.Mutex
-	done   chan struct{}
-	closed bool
+	writer       io.Writer
+	buffer       *CircularBuffer
+	mu           sync.Mutex
+	done         chan struct{}
+	closed       bool
+	disconnected chan struct{} // closed when readLoop exits (EOF or error)
 }
 
 // NewEngine creates an expect engine.
 // It starts a background goroutine that reads from reader into a circular buffer.
 func NewEngine(reader io.Reader, writer io.Writer, bufSize int) *Engine {
 	e := &Engine{
-		writer: writer,
-		buffer: NewCircularBuffer(bufSize),
-		done:   make(chan struct{}),
+		writer:       writer,
+		buffer:       NewCircularBuffer(bufSize),
+		done:         make(chan struct{}),
+		disconnected: make(chan struct{}),
 	}
 	go e.readLoop(reader)
 	return e
 }
 
 // readLoop continuously reads from the reader into the buffer.
+// Closes e.disconnected when the reader returns an error (EOF or connection drop).
 func (e *Engine) readLoop(reader io.Reader) {
+	defer close(e.disconnected)
 	buf := make([]byte, 4096)
 	for {
 		select {
@@ -54,8 +61,20 @@ func (e *Engine) readLoop(reader io.Reader) {
 	}
 }
 
+// Disconnected returns a channel that is closed when the connection drops.
+func (e *Engine) Disconnected() <-chan struct{} {
+	return e.disconnected
+}
+
 // Send writes data to the underlying writer.
+// Returns ErrDisconnected if the connection has dropped.
 func (e *Engine) Send(_ context.Context, data string) error {
+	select {
+	case <-e.disconnected:
+		return ErrDisconnected
+	default:
+	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -87,6 +106,16 @@ func (e *Engine) ExpectAny(ctx context.Context, patterns []Pattern) ([]byte, int
 		}
 
 		select {
+		case <-e.disconnected:
+			// Drain any remaining data in buffer before returning error
+			data = e.buffer.Bytes()
+			if len(data) > 0 {
+				if idx, end, ok := MatchAny(patterns, data); ok {
+					consumed := e.buffer.ConsumeUpTo(end)
+					return consumed, idx, nil
+				}
+			}
+			return nil, 0, fmt.Errorf("expect: %w", ErrDisconnected)
 		case <-ctx.Done():
 			return nil, 0, fmt.Errorf("expect: %w", ctx.Err())
 		case <-ticker.C:
