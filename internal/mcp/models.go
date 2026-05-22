@@ -30,7 +30,8 @@ type SessionExecInput struct {
 
 // SessionExecOutput is the output for session_exec.
 type SessionExecOutput struct {
-	Output string `json:"output"`
+	Output   string `json:"output"`
+	Prompted bool   `json:"prompted"` // true if an interactive prompt (Password: etc) was detected
 }
 
 // SessionInteractInput is the input for session_interact.

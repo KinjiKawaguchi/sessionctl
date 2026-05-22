@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"regexp"
 	"sync"
 	"time"
 )
+
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 const defaultPollInterval = 50 * time.Millisecond
 
@@ -24,16 +27,32 @@ type Engine struct {
 	done         chan struct{}
 	closed       bool
 	disconnected chan struct{} // closed when readLoop exits (EOF or error)
+	stripANSI    bool
+}
+
+// Option configures an Engine.
+type Option func(*Engine)
+
+// WithStripANSI enables or disables ANSI escape sequence stripping.
+// When enabled, ANSI codes are removed from data before it enters the buffer,
+// improving pattern match reliability on PTY connections.
+func WithStripANSI(strip bool) Option {
+	return func(e *Engine) {
+		e.stripANSI = strip
+	}
 }
 
 // NewEngine creates an expect engine.
 // It starts a background goroutine that reads from reader into a circular buffer.
-func NewEngine(reader io.Reader, writer io.Writer, bufSize int) *Engine {
+func NewEngine(reader io.Reader, writer io.Writer, bufSize int, opts ...Option) *Engine {
 	e := &Engine{
 		writer:       writer,
 		buffer:       NewCircularBuffer(bufSize),
 		done:         make(chan struct{}),
 		disconnected: make(chan struct{}),
+	}
+	for _, opt := range opts {
+		opt(e)
 	}
 	go e.readLoop(reader)
 	return e
@@ -53,7 +72,13 @@ func (e *Engine) readLoop(reader io.Reader) {
 
 		n, err := reader.Read(buf)
 		if n > 0 {
-			e.buffer.Write(buf[:n])
+			data := buf[:n]
+			if e.stripANSI {
+				data = ansiRegex.ReplaceAll(data, nil)
+			}
+			if len(data) > 0 {
+				e.buffer.Write(data)
+			}
 		}
 		if err != nil {
 			return

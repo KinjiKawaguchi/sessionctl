@@ -283,3 +283,81 @@ func TestEngine_SendAfterDisconnect(t *testing.T) {
 		t.Fatalf("expected disconnected error, got: %v", err)
 	}
 }
+
+func TestEngine_StripANSI(t *testing.T) {
+	// Device sends prompt with ANSI color codes
+	deviceOutput := "\x1b[32mSwitch\x1b[0m# "
+	reader := strings.NewReader(deviceOutput)
+
+	eng := NewEngine(reader, io.Discard, 1024, WithStripANSI(true))
+	defer eng.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Pattern matches clean text — should work because ANSI was stripped at write time
+	prompt := Pattern{Kind: PatternExact, Text: "Switch#"}
+	output, err := eng.Expect(ctx, prompt)
+	if err != nil {
+		t.Fatalf("Expect failed: %v", err)
+	}
+	if strings.Contains(string(output), "\x1b") {
+		t.Fatalf("output still contains ANSI: %q", string(output))
+	}
+}
+
+func TestEngine_StripANSI_Disabled(t *testing.T) {
+	deviceOutput := "\x1b[32mSwitch\x1b[0m# "
+	reader := strings.NewReader(deviceOutput)
+
+	eng := NewEngine(reader, io.Discard, 1024, WithStripANSI(false))
+	defer eng.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Match against raw data including ANSI
+	prompt := Pattern{Kind: PatternExact, Text: "\x1b[0m# "}
+	output, err := eng.Expect(ctx, prompt)
+	if err != nil {
+		t.Fatalf("Expect failed: %v", err)
+	}
+	if !strings.Contains(string(output), "\x1b") {
+		t.Fatalf("expected ANSI in output: %q", string(output))
+	}
+}
+
+func TestEngine_ExpectAny_ReturnsPromptIndex(t *testing.T) {
+	// Simulates: command output followed by a Password: prompt (not the device prompt)
+	engineReader, deviceWriter := io.Pipe()
+	eng := NewEngine(engineReader, io.Discard, 1024)
+	defer eng.Close()
+
+	go func() {
+		deviceWriter.Write([]byte("sudo: password required\nPassword: "))
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Watch for both device prompt AND interactive prompts
+	patterns := []Pattern{
+		{Kind: PatternExact, Text: "Switch>"},       // index 0: device prompt
+		{Kind: PatternExact, Text: "Password: "},    // index 1: interactive prompt
+	}
+
+	output, idx, err := eng.ExpectAny(ctx, patterns)
+	if err != nil {
+		t.Fatalf("ExpectAny failed: %v", err)
+	}
+	if idx != 1 {
+		t.Fatalf("expected pattern index 1 (Password:), got %d", idx)
+	}
+	if !strings.Contains(string(output), "password required") {
+		t.Fatalf("output %q missing preceding text", string(output))
+	}
+}

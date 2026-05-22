@@ -75,7 +75,7 @@ func HandleSessionOpen(
 		return nil, SessionOpenOutput{}, fmt.Errorf("connect: %w", err)
 	}
 
-	eng := expect.NewEngine(tr.Stdout, tr.Stdin, 16384)
+	eng := expect.NewEngine(tr.Stdout, tr.Stdin, 1048576, expect.WithStripANSI(true))
 
 	connIdx := deps.Store.AddConnection(session.ConnectionEntry{
 		Engine: eng,
@@ -149,20 +149,33 @@ func HandleSessionExec(
 	}
 
 	prof, _ := deps.Profiles.Lookup(entry.ProfileKey)
+
+	// Build watch patterns: device prompts + interactive prompts (Password: etc)
+	watchPatterns := make([]expect.Pattern, 0, len(prof.PromptPatterns)+len(prof.LoginPatterns))
+	watchPatterns = append(watchPatterns, prof.PromptPatterns...)
+	promptBoundary := len(watchPatterns)
+	watchPatterns = append(watchPatterns, prof.LoginPatterns...)
+
 	var output []byte
-	if len(prof.PromptPatterns) > 0 {
+	var matchIdx int
+	if len(watchPatterns) > 0 {
 		if prof.PagerPattern.Kind != 0 || prof.PagerPattern.Text != "" || prof.PagerPattern.Regex != nil {
 			pager := expect.Pager{Pattern: prof.PagerPattern, Response: prof.PagerResponse}
-			output, _, _ = eng.ExpectWithPager(execCtx, prof.PromptPatterns, pager)
+			output, matchIdx, _ = eng.ExpectWithPager(execCtx, watchPatterns, pager)
 		} else {
-			output, _ = eng.Expect(execCtx, prof.PromptPatterns[0])
+			output, matchIdx, _ = eng.ExpectAny(execCtx, watchPatterns)
 		}
 	}
 
+	prompted := matchIdx >= promptBoundary
+
 	text := string(output)
+	if prompted {
+		text += "\n[interactive prompt detected — use session_interact to respond]"
+	}
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
-	}, SessionExecOutput{Output: text}, nil
+	}, SessionExecOutput{Output: text, Prompted: prompted}, nil
 }
 
 // HandleSessionInteract sends input and optionally waits for a pattern.
