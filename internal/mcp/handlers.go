@@ -75,7 +75,8 @@ func HandleSessionOpen(
 		return nil, SessionOpenOutput{}, fmt.Errorf("connect: %w", err)
 	}
 
-	eng := expect.NewEngine(tr.Stdout, tr.Stdin, 1048576, expect.WithStripANSI(true))
+	stripANSI := input.StripANSI == nil || *input.StripANSI
+	eng := expect.NewEngine(tr.Stdout, tr.Stdin, 1048576, expect.WithStripANSI(stripANSI))
 
 	connIdx := deps.Store.AddConnection(session.ConnectionEntry{
 		Engine: eng,

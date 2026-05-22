@@ -10,7 +10,8 @@ type SessionOpenInput struct {
 	Protocol string `json:"protocol,omitempty" mcp:"ssh (default) or telnet"`
 	Username string `json:"username" mcp:"authentication username"`
 	Password string `json:"password" mcp:"authentication password"`
-	Profile  string `json:"profile,omitempty" mcp:"device profile: cisco_ios, yamaha_rtx, unix"`
+	Profile   string `json:"profile,omitempty" mcp:"device profile: cisco_ios, yamaha_rtx, unix"`
+	StripANSI *bool  `json:"strip_ansi,omitempty" mcp:"strip ANSI escape sequences from output (default: true)"`
 }
 
 // SessionOpenOutput is the output for session_open.
