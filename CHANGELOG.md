@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/KinjiKawaguchi/sessionctl/compare/v0.2.0...v0.2.1) (2026-05-22)
+
+
+### Bug Fixes
+
+* use Node.js 24 for npm publish OIDC trusted publisher ([5d6ebb3](https://github.com/KinjiKawaguchi/sessionctl/commit/5d6ebb35819b2dbe21bd41410570ea4d764f00fb))
+
 ## [0.2.0](https://github.com/KinjiKawaguchi/sessionctl/compare/v0.1.1...v0.2.0) (2026-05-22)
 
 
