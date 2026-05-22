@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/KinjiKawaguchi/sessionctl/compare/v0.2.1...v0.3.0) (2026-05-22)
+
+
+### Features
+
+* **mcp:** expose strip_ansi option on session_open ([940dd98](https://github.com/KinjiKawaguchi/sessionctl/commit/940dd98754fdd3bc5f7f917aca29b8c0a320e3cd))
+
 ## [0.2.1](https://github.com/KinjiKawaguchi/sessionctl/compare/v0.2.0...v0.2.1) (2026-05-22)
 
 
